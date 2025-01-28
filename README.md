@@ -1,6 +1,8 @@
 # Upgrading Custom Datasets Resolution
 
-This repository implements Super-Resolution Generative Adversarial Networks (SRGAN and ESRGAN) using PyTorch. The models aim to upscale low-resolution images, enhancing their quality for various applications. Currently, SRGAN is fully implemented, while ESRGAN is still in progress.
+This repository implements Super-Resolution Generative Adversarial Networks (SRGAN and ESRGAN) using PyTorch. The models aim to upscale low-resolution images, enhancing their quality for various applications. Currently,
+- SRGAN ✅ Completed
+- ESRGAN 🚧 Still in Progress
 
 
 ## Project Overview
@@ -46,7 +48,7 @@ Upgrading-Custom-Datasets-Resolution/
 │   ├── model.py         # Generator and Discriminator definitions.
 │   ├── train.py         # Training loop setup.
 │   ├── utils.py         # Utility functions for saving/loading models, logging, etc.
-│── ESRGAN/              # (Upcoming) ESRGAN implementation will be added here.
+│── ESRGAN/              # 🚧 (Upcoming) ESRGAN implementation will be added here.
 ```
 
 
