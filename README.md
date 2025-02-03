@@ -31,11 +31,6 @@ Enhanced Super-Resolution Generative Adversarial Network (ESRGAN) is an improvem
 | Loss Functions  |  Content + Adversarial loss      |  Improved perceptual loss                 |
 | Output Quality  |  Decent image enhancement        |  Sharper, more detailed outputs           |
 
-| First Header  | Second Header |
-| ------------- | ------------- |
-| Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  |
-
 
 ## Project Structure
 
