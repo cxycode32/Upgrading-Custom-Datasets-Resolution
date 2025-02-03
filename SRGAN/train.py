@@ -14,7 +14,7 @@ from utils import (
     clear_directories,
     save_checkpoint,
     load_checkpoint,
-    save_progress_image,
+    debug_dataset,
     plot_training_losses,
     log_metrics_to_tensorboard,
     log_images_to_tensorboard,
@@ -53,23 +53,10 @@ def prepare_dataloader():
     Returns:
         DataLoader: The DataLoader instance for training.
     """
-    dataset = CustomDataset(root_dir=config.DATASET_DIR)
+    dataset = CustomDataset(root_dir=config.DATASET_DIR, processed_img_dir=config.PROCESSED_IMAGE_DIR)
     loader = DataLoader(dataset, batch_size=config.BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=config.NUM_WORKERS)
 
     return dataset, loader
-
-
-def debug_dataset(dataset):
-    for low_res, high_res in dataset:
-        plt.figure()
-        plt.subplot(1, 2, 1)
-        plt.imshow(low_res.permute(1, 2, 0).numpy())
-        plt.title("Low Resolution")
-        plt.subplot(1, 2, 2)
-        plt.imshow(high_res.permute(1, 2, 0).numpy())
-        plt.title("High Resolution")
-        plt.show()
-        break
 
 
 def train_model():
@@ -130,6 +117,7 @@ def train_model():
 
             disc_fake = discriminator(fake)
             adversarial_loss = config.ADVERSARIAL_LOSS * bce(disc_fake, torch.ones_like(disc_fake))
+            fake = torch.nn.functional.interpolate(fake, size=high_res.shape[2:], mode='bilinear', align_corners=False)
             vgg_loss = 0.006 * vgg(fake, high_res)
 
             gen_loss = vgg_loss + adversarial_loss

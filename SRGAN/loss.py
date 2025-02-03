@@ -47,5 +47,3 @@ class VGGLoss(nn.Module):
         vgg_input_features = self.vgg(input)
         vgg_target_features = self.vgg(target)
         return self.loss(vgg_input_features, vgg_target_features)
-
-

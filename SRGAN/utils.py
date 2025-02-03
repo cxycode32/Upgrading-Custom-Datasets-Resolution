@@ -1,14 +1,13 @@
 import os
-import cv2
 import glob
 import torch
 import shutil
 import imageio
 import torchvision
 import torchvision.transforms as transforms
-import torchvision.utils as vutils
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 import config
 
@@ -73,33 +72,38 @@ def load_checkpoint(type, epoch, model, optimizer, dir=config.MODEL_DIR, learnin
     print("Checkpoint loaded successfully.")
 
 
-def save_progress_image(epoch, batch_idx, low_res, fake, high_res, class_name, img_name, root_dir=config.IMAGE_DIR):
+def save_image(tensor_image, save_path):
     """
-    Save progress images for visualization.
-
+    Saves a tensor image to the specified path.
+    
     Args:
-        epoch (int): Current training epoch.
-        batch_idx (int): Current batch index.
-        low_res (tensor): Low-resolution input image.
-        fake (tensor): Generated high-resolution image.
-        high_res (tensor): Ground truth high-resolution image.
-        class_name (str): The folder name of the class.
-        img_name (str): The original filename of the image.
+        tensor_image (Tensor): The image tensor to save.
+        save_path (str): Path to save the image file.
     """
-    save_dir = os.path.join(root_dir, class_name)
-    os.makedirs(save_dir, exist_ok=True)
+    # Ensure the tensor image is in the correct range [0, 1]
+    tensor_image = tensor_image.clamp(0, 1)
+    
+    # Convert the tensor to a PIL Image
+    pil_image = transforms.ToPILImage()(tensor_image)
+    
+    # Create the directories if they do not exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    
+    # Save the image
+    pil_image.save(save_path)
 
-    transform = transforms.ToPILImage()
 
-    # Convert tensor to PIL Image
-    fake_img = transform(fake.cpu())
-    low_res_img = transform(low_res.cpu())
-    high_res_img = transform(high_res.cpu())
-
-    # Save images
-    fake_img.save(f"{save_dir}/{img_name}_fake_epoch{epoch}_batch{batch_idx}.png")
-    low_res_img.save(f"{save_dir}/{img_name}_low_res_epoch{epoch}_batch{batch_idx}.png")
-    high_res_img.save(f"{save_dir}/{img_name}_high_res_epoch{epoch}_batch{batch_idx}.png")
+def debug_dataset(dataset):
+    for low_res, high_res in dataset:
+        plt.figure()
+        plt.subplot(1, 2, 1)
+        plt.imshow(low_res.permute(1, 2, 0).numpy())
+        plt.title("Low Resolution")
+        plt.subplot(1, 2, 2)
+        plt.imshow(high_res.permute(1, 2, 0).numpy())
+        plt.title("High Resolution")
+        plt.show()
+        break
 
 
 def plot_training_losses(disc_losses, gen_losses, save_dir=config.ASSETS_DIR, filename="training_loss.png"):
@@ -164,7 +168,7 @@ def log_images_to_tensorboard(writer, real_images, fake_images, step):
     writer.add_image("Generated Images", grid_fake, step)
 
 
-def create_gif(save_dir=config.ASSETS_DIR, image_dir=config.IMAGE_DIR, filename="gan_training"):
+def create_gif(save_dir=config.ASSETS_DIR, image_dir=config.GENERATED_IMAGE_DIR, filename="gan_training"):
     """
     Creates a GIF from the saved sample images.
 

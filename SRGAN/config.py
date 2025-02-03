@@ -25,29 +25,7 @@ LOW_RES = HIGH_RES // 4
 MODEL_DIR = "models"
 DATASET_DIR = "dataset/"
 ASSETS_DIR = "assets"
-IMAGE_DIR = "generated_images"
+PROCESSED_IMAGE_DIR = "processed_images"
+GENERATED_IMAGE_DIR = "generated_images"
 LOG_DIR = "logs"
-DIRECTORIES=[ASSETS_DIR, IMAGE_DIR, LOG_DIR]
-
-general_transform = A.Compose(
-    [
-        A.RandomCrop(width=HIGH_RES, height=HIGH_RES),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-    ]
-)
-
-high_res_transform = A.Compose(
-    [
-        A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-        ToTensorV2(),
-    ]
-)
-
-low_res_transform = A.Compose(
-    [
-        A.Resize(width=LOW_RES, height=LOW_RES, interpolation=Image.BICUBIC),
-        A.Normalize(mean=[0, 0, 0], std=[1, 1, 1]),
-        ToTensorV2(),
-    ]
-)
+DIRECTORIES=[ASSETS_DIR, PROCESSED_IMAGE_DIR, GENERATED_IMAGE_DIR, LOG_DIR]
