@@ -24,12 +24,17 @@ Enhanced Super-Resolution Generative Adversarial Network (ESRGAN) is an improvem
 
 ### SRGAN vs ESRGAN
 
-**Feature**         |   **SRGAN**                           |   **ESRGAN**
--------------------------------------------------------------------------------------------------------
-Architecture        |   Basic GAN with residual blocks      |   RRDB-based for better texture retention
-Discriminator       |   Standard binary classifier          |   Relativistic GAN for improved training
-Loss Functions      |   Content + Adversarial loss          |   Improved perceptual loss
-Output Quality      |   Decent image enhancement            |   Sharper, more detailed outputs
+| Feature         |  SRGAN                           |  ESRGAN                                   |
+| --------------  |  ------------------------------  |  ---------------------------------------- |
+| Architecture    |  Basic GAN with residual blocks  |  RRDB-based for better texture retention  |
+| Discriminator   |  Standard binary classifier      |  Relativistic GAN for improved training   |
+| Loss Functions  |  Content + Adversarial loss      |  Improved perceptual loss                 |
+| Output Quality  |  Decent image enhancement        |  Sharper, more detailed outputs           |
+
+| First Header  | Second Header |
+| ------------- | ------------- |
+| Content Cell  | Content Cell  |
+| Content Cell  | Content Cell  |
 
 
 ## Project Structure
