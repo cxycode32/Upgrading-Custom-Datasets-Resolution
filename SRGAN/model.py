@@ -33,7 +33,7 @@ class UpsampleBlock(nn.Module):
     Upsampling block using PixelShuffle to increase resolution.
     
     Args:
-        in_c (int): Number of input channels.
+        in_channels (int): Number of input channels.
         scale_factor (int): Factor by which the spatial resolution is increased.
     """
     def __init__(self, in_channels, scale_factor):
