@@ -67,13 +67,30 @@ def prepare_dataloader():
 
 
 def gradient_penalty(critic, real, fake, device=config.DEVICE):
+    """
+    Computes the gradient penalty for the Wasserstein GAN (WGAN) loss function.
+    
+    This enforces the Lipschitz constraint by calculating the norm of the gradients 
+    with respect to interpolated images between real and fake data.
+
+    Args:
+        critic (nn.Module): The discriminator (or critic) of the WGAN.
+        real (torch.Tensor): The real image batch.
+        fake (torch.Tensor): The generated (fake) image batch.
+        device (str): The device on which computations are performed (default: 'cuda').
+
+    Returns:
+        torch.Tensor: The computed gradient penalty.
+    """
     BATCH_SIZE, C, H, W = real.shape
-    alpha = torch.rand((BATCH_SIZE, 1, 1, 1)).repeat(1, C, H, W).to(device)
-    interpolated_images = real * alpha + fake.detach() * (1 - alpha)
+    alpha = torch.rand((BATCH_SIZE, 1, 1, 1)).repeat(1, C, H, W).to(device)  # Generate random alpha
+    interpolated_images = real * alpha + fake.detach() * (1 - alpha)  # Interpolate between real and fake
     interpolated_images.requires_grad_(True)
 
+    # Get the discriminator (critic) score for the interpolated images
     mixed_scores = critic(interpolated_images)
 
+    # Compute the gradients of the critic with respect to the interpolated images
     gradient = torch.autograd.grad(
         inputs=interpolated_images,
         outputs=mixed_scores,
@@ -81,9 +98,9 @@ def gradient_penalty(critic, real, fake, device=config.DEVICE):
         create_graph=True,
         retain_graph=True,
     )[0]
-    gradient = gradient.view(gradient.shape[0], -1)
-    gradient_norm = gradient.norm(2, dim=1)
-    gradient_penalty = torch.mean((gradient_norm - 1) ** 2)
+    gradient = gradient.view(gradient.shape[0], -1)  # Flatten gradient tensor
+    gradient_norm = gradient.norm(2, dim=1)  # L2 norm of the gradient
+    gradient_penalty = torch.mean((gradient_norm - 1) ** 2)  # Calculate the penalty (WGAN-GP)
     return gradient_penalty
 
 
