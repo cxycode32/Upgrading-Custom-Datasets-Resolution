@@ -9,9 +9,9 @@ class ConvBlock(nn.Module):
     Args:
         in_channels (int): Number of input channels.
         out_channels (int): Number of output channels.
-        discriminator (bool): Boolean to decide if this block is for the discriminator (uses LeakyReLU activation).
-        apply_activation (bool): If True, applies activation function.
-        apply_normalization (bool): If True, applies batch normalization.
+        discriminator (bool): If True, applies LeakyReLU instead of PReLU (used in the discriminator).
+        apply_activation (bool): Applies an activation function if True.
+        apply_normalization (bool): Applies batch normalization if True.
     """
     def __init__(self, in_channels, out_channels, discriminator=False, apply_activation=True, apply_normalization=True, **kwargs):
         super().__init__()
@@ -34,7 +34,7 @@ class UpsampleBlock(nn.Module):
     
     Args:
         in_c (int): Number of input channels.
-        scale_factor (int): Factor by which the resolution will be increased.
+        scale_factor (int): Factor by which the spatial resolution is increased.
     """
     def __init__(self, in_channels, scale_factor):
         super().__init__()
@@ -48,7 +48,9 @@ class UpsampleBlock(nn.Module):
 
 class ResidualBlock(nn.Module):
     """
-    Residual block used in Generator to extract features.
+    Residual block used in the generator to enhance feature extraction.
+    
+    Helps stabilize training by allowing gradients to flow through shortcut connections.
     
     Args:
         in_channels (int): Number of input channels.
@@ -68,10 +70,12 @@ class Generator(nn.Module):
     """
     Generator model for SRGAN to upscale low-resolution images to high resolution.
     
+    Consists of an initial convolution, multiple residual blocks, feature refinement, upsampling, and final output processing.
+    
     Args:
         in_channels (int): Number of input channels (usually 3 for RGB).
-        num_channels (int): Number of channels in the initial layer and residual blocks.
-        num_blocks (int): Number of residual blocks to use.
+        num_channels (int): Number of channels in the intermediate layers.
+        num_blocks (int): Number of residual blocks.
     """
     def __init__(self, in_channels=3, num_channels=64, num_blocks=16):
         super().__init__()
@@ -102,6 +106,8 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     """
     Discriminator model for SRGAN to classify images as real or fake.
+    
+    Extracts features using convolutional layers and reduces spatial dimensions before fully connected classification.
     
     Args:
         in_channels (int): Number of input channels.
