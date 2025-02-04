@@ -1,34 +1,36 @@
 import os
 from glob import glob
-from torchvision import transforms
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms
+import config
 from utils import save_image
 
 
 class CustomDataset(Dataset):
     """
-    Custom dataset class for loading and processing images for SRGAN training.
+    Custom dataset class for loading and processing images.
     
     Args:
-        root_dir (str): Path to the root directory containing image subdirectories.
+        dataset_dir (str): Path to the dataset directory.
+        processed_dataset_dir (str): Path to save processed images.
     """
-    def __init__(self, root_dir, processed_img_dir):
+    def __init__(self, dataset_dir, processed_dataset_dir):
         super(CustomDataset, self).__init__()
         self.data = []
-        self.root_dir = root_dir
-        self.processed_img_dir = processed_img_dir
-        self.class_names = os.listdir(root_dir)
+        self.dataset_dir = dataset_dir
+        self.processed_img_dir = processed_dataset_dir
+        self.class_names = os.listdir(dataset_dir)
 
         for class_name in self.class_names:
-            class_path = os.path.join(root_dir, class_name)
+            class_path = os.path.join(dataset_dir, class_name)
             if not os.path.isdir(class_path): 
                 continue
             
             image_files = glob(os.path.join(class_path, "*"))
             self.data += [(image_path, class_name) for image_path in image_files]
             
-            processed_class_path = os.path.join(processed_img_dir, class_name)
+            processed_class_path = os.path.join(processed_dataset_dir, class_name)
             os.makedirs(os.path.join(processed_class_path, "lr"), exist_ok=True)
             os.makedirs(os.path.join(processed_class_path, "hr"), exist_ok=True)
             
@@ -49,8 +51,6 @@ class CustomDataset(Dataset):
         image_path, class_name = self.data[index]
         image_name = os.path.basename(image_path)
 
-        print(f"{index}: {image_path}, {class_name}, {image_name}")
-        
         image = Image.open(image_path).convert("RGB")
         
         low_res = process_to_low_res(image)
@@ -67,9 +67,9 @@ class CustomDataset(Dataset):
         
         Args:
             tensor_image (Tensor): The image tensor to save.
-            class_name (str): The class of the image (e.g., gpay).
+            class_name (str): The class of the image.
             image_name (str): The name of the image file.
-            res_type (str): The resolution type, either 'lr' or 'hr'.
+            res_type (str): The resolution type, either 'lr' (low-resolution) or 'hr' (high-resolution).
         """
         save_dir = os.path.join(self.processed_img_dir, class_name, res_type)
         os.makedirs(save_dir, exist_ok=True)
@@ -116,7 +116,16 @@ def resize_and_pad(image, target_size, fill_color=(0, 0, 0)):
 
 
 def process_to_low_res(image):
-    image = resize_and_pad(image, (128, 128), fill_color=(0, 0, 0))  # Black padding
+    """
+    Processes an image into a low-resolution version by resizing and applying transformations.
+
+    Args:
+        image (PIL.Image): Input image.
+
+    Returns:
+        Tensor: Transformed low-resolution image.
+    """
+    image = resize_and_pad(image, (config.LOW_RES, config.LOW_RES), fill_color=(0, 0, 0))
     transform = transforms.Compose([
         transforms.Lambda(lambda img: transforms.functional.adjust_contrast(img, 1.0)),
         transforms.ToTensor(),
@@ -125,7 +134,16 @@ def process_to_low_res(image):
 
 
 def process_to_high_res(image):
-    image = resize_and_pad(image, (256, 256), fill_color=(0, 0, 0))  # Black padding
+    """
+    Processes an image into a high-resolution version by resizing and applying transformations.
+
+    Args:
+        image (PIL.Image): Input image.
+
+    Returns:
+        Tensor: Transformed high-resolution image.
+    """
+    image = resize_and_pad(image, (config.HIGH_RES, config.HIGH_RES), fill_color=(0, 0, 0))
     transform = transforms.Compose([
         transforms.Lambda(lambda img: transforms.functional.adjust_contrast(img, 1.5)),
         transforms.ToTensor(),

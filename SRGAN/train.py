@@ -1,20 +1,19 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import config
-from model import Generator, Discriminator
 from dataset import CustomDataset
+from model import Generator, Discriminator
 from loss import VGGLoss
-import matplotlib.pyplot as plt
 from utils import (
     clear_directories,
     save_checkpoint,
     load_checkpoint,
     debug_dataset,
+    save_generated_image,
     plot_training_losses,
     log_metrics_to_tensorboard,
     log_images_to_tensorboard,
@@ -24,9 +23,9 @@ from utils import (
 """
 This is a PyTorch settings that optimizes performance when using CuDNN.
 
-What is does:
-When benchmark = True, PyTorch dynamically finds the fastest convolution algorithms for your model based on the input size.
-If your input size stays the same across iterations, CuDNN caches the best algorithm and speeds up training.
+What it does:
+- When benchmark = True, PyTorch dynamically finds the fastest convolution algorithms for your model based on the input size.
+- If your input size stays the same across iterations, CuDNN caches the best algorithm and speeds up training.
 
 When to use it:
 ✅ Use it when input sizes are fixed (e.g., images of the same size).
@@ -36,7 +35,15 @@ torch.backends.cudnn.benchmarks = True
 
 
 def prompt_for_epoch(model):
-    """Prompts the user for an epoch number to load a model from."""
+    """
+    Prompts the user for an epoch number to load a saved model.
+
+    Args:
+        model (str): The model type (e.g., 'generator' or 'discriminator').
+        
+    Returns:
+        epoch (int): The selected epoch number. Defaults to 0 if input is invalid.
+    """
     epoch = input(f"What epoch do you want to load the {model} model from: ").strip()
 
     if not epoch.isdigit():
@@ -48,12 +55,12 @@ def prompt_for_epoch(model):
 
 def prepare_dataloader():
     """
-    Prepares the DataLoader for training by loading the dataset with proper transformations.
-    
+    Loads and prepares the dataset for training.
+
     Returns:
-        DataLoader: The DataLoader instance for training.
+        tuple: (Dataset instance, DataLoader instance)
     """
-    dataset = CustomDataset(root_dir=config.DATASET_DIR, processed_img_dir=config.PROCESSED_IMAGE_DIR)
+    dataset = CustomDataset(dataset_dir=config.DATASET_DIR, processed_dataset_dir=config.PROCESSED_IMAGE_DIR)
     loader = DataLoader(dataset, batch_size=config.BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=config.NUM_WORKERS)
 
     return dataset, loader
@@ -61,14 +68,18 @@ def prepare_dataloader():
 
 def train_model():
     """
-    Main function to train the SRGAN model. It initializes the generator and discriminator,
-    defines the loss functions, sets up optimizers, and executes the training loop.
+    Trains the model by handling:
+    - Model initialization (Generator & Discriminator)
+    - Loss function setup (Adversarial, Perceptual, MSE)
+    - Optimizer setup (Adam for both models)
+    - Training loop execution
+    - Periodic checkpoint saving and TensorBoard logging
     """
     clear_directories()
     
     dataset, loader = prepare_dataloader()
     
-    debug_dataset(dataset)
+    debug_dataset(dataset, num=10)
     
     generator = Generator(config.IN_CHANNELS).to(config.DEVICE)
     discriminator = Discriminator(config.IMG_CHANNELS).to(config.DEVICE)
@@ -103,9 +114,10 @@ def train_model():
             disc_real = discriminator(high_res)
             disc_fake = discriminator(fake.detach())
 
-            disc_real_loss = bce(disc_real, torch.ones_like(disc_real) * 0.9)
+            disc_real_loss = bce(disc_real, torch.ones_like(disc_real) * 0.9)  # 0.9 for label smoothing
             disc_fake_loss = bce(disc_fake, torch.zeros_like(disc_fake))
 
+            # Loss (Discriminator) = Loss (real) + Loss (fake)
             disc_loss = disc_real_loss + disc_fake_loss
             disc_losses.append(disc_loss.item())
 
@@ -120,6 +132,9 @@ def train_model():
             fake = torch.nn.functional.interpolate(fake, size=high_res.shape[2:], mode='bilinear', align_corners=False)
             vgg_loss = 0.006 * vgg(fake, high_res)
 
+            # Loss (Generator) = Loss (VGG) + Loss (Adversarial)
+            # VGG loss (aka content loss) is for making sure the generated images look perceptually similar to real images.
+            # Adversarial loss is for encouraging the generator to fool the discriminator.
             gen_loss = vgg_loss + adversarial_loss
             gen_losses.append(gen_loss.item())
 
@@ -127,14 +142,15 @@ def train_model():
             gen_loss.backward()
             opt_gen.step()
 
-            # if batch_idx % 200 == 0:
-            print(f"EPOCH[{epoch + 1}/{config.EPOCHS_NUM}], BATCH[{batch_idx}/{len(loader)}], "
+            print(f"EPOCH[{epoch + 1}/{config.EPOCHS_NUM}], BATCH[{batch_idx + 1}/{len(loader)}], "
                 f"\nDISC REAL LOSS: {disc_real_loss:.2f}, DISC FAKE LOSS: {disc_fake_loss:.2f}, DISC LOSS: {disc_loss:.2f}, "
                 f"\nVGG LOSS: {vgg_loss:.2f}, ADVERSARIAL LOSS: {adversarial_loss:.2f}, GEN LOSS: {gen_loss:.2f}")
             
-            with torch.no_grad():
-                log_metrics_to_tensorboard(writer, disc_loss.item(), gen_loss.item(), step)                
-                log_images_to_tensorboard(writer, high_res, fake, step)
+            if batch_idx % 50 == 0:
+                with torch.no_grad():  # Disable gradient tracking to save memory and improve efficiency
+                    save_generated_image(fake, epoch, batch_idx)
+                    log_metrics_to_tensorboard(writer, disc_loss.item(), gen_loss.item(), step)                
+                    log_images_to_tensorboard(writer, high_res, fake, step)
 
             step += 1
 

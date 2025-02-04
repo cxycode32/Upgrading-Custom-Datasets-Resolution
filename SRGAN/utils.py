@@ -4,18 +4,19 @@ import torch
 import shutil
 import imageio
 import torchvision
+import torchvision.utils as vutils
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
-from skimage.metrics import structural_similarity as ssim
 import config
 
 
 def clear_directories():
     """
     Deletes all directories specified in the configuration file.
-    This is useful for clearing previous training outputs.
+    
+    This is useful for clearing previous training outputs, ensuring
+    that new experiments start fresh without leftover data.
     """
     for directory in config.DIRECTORIES:
         if os.path.exists(directory):
@@ -23,16 +24,16 @@ def clear_directories():
             print(f"{directory}/ deleted successfully!")
 
 
-def save_checkpoint(type, epoch, model, optimizer, dir=config.MODEL_DIR):
+def save_checkpoint(type, epoch, model, optimizer, dir=config.MODELS_DIR):
     """
     Saves the model and optimizer states as a checkpoint.
 
     Args:
-        type (str): The type of model to save ('critic' or 'generator').
+        type (str): The type of model to save ('discriminator' or 'generator').
         epoch (int): The current epoch, used to name the checkpoint.
-        model (torch.nn.Module): The model to save.
-        optimizer (torch.optim.Optimizer): The optimizer to save states.
-        dir (str, optional): Directory to store the checkpoint. Defaults to config.MODEL_DIR.
+        model (torch.nn.Module): The model whose state needs to be saved.
+        optimizer (torch.optim.Optimizer): The optimizer whose state needs to be saved.
+        dir (str, optional): Directory to store the checkpoint. Defaults to config.MODELS_DIR.
     """
     print("Saving checkpoint......")
     os.makedirs(dir, exist_ok=True)
@@ -45,17 +46,21 @@ def save_checkpoint(type, epoch, model, optimizer, dir=config.MODEL_DIR):
     print("Checkpoint saved successfully.")
 
 
-def load_checkpoint(type, epoch, model, optimizer, dir=config.MODEL_DIR, learning_rate=config.GEN_LEARNING_RATE if type=="generator" else config.DISC_LEARNING_RATE):
+def load_checkpoint(type, epoch, model, optimizer, dir=config.MODELS_DIR, learning_rate=config.GEN_LEARNING_RATE if type=="generator" else config.DISC_LEARNING_RATE):
     """
     Loads a saved model checkpoint.
 
     Args:
-        type (str): The type of model to load ('critic' or 'generator').
-        epoch (int): Load the model from which epoch.
-        model (torch.nn.Module): The model to load the checkpoint into.
-        optimizer (torch.optim.Optimizer): The optimizer to restore states from the checkpoint.
-        dir (str, optional): Directory where the checkpoint is stored. Defaults to config.MODEL_DIR.
-        learning_rate (float, optional): Learning rate to be set after loading the optimizer state. Defaults to config.LEARNING_RATE.
+        type (str): The type of model to load ('discriminator' or 'generator').
+        epoch (int): The epoch from which the model should be loaded.
+        model (torch.nn.Module): The model where the checkpoint is loaded.
+        optimizer (torch.optim.Optimizer): The optimizer where the checkpoint is loaded.
+        dir (str, optional): Directory where the checkpoint is stored. Defaults to config.MODELS_DIR.
+        learning_rate (float, optional): Learning rate reset after loading the checkpoint.
+            Defaults to config.GEN_LEARNING_RATE for the generator and config.DISC_LEARNING_RATE for the discriminator.
+
+    Warning:
+        If the checkpoint file does not exist, the function prints a warning and does not modify the model.
     """
     checkpoint_path = os.path.join(dir, f"{type}_{epoch}.pth")
 
@@ -77,53 +82,96 @@ def save_image(tensor_image, save_path):
     Saves a tensor image to the specified path.
     
     Args:
-        tensor_image (Tensor): The image tensor to save.
+        tensor_image (Tensor): The image tensor to save. Must have shape (C, H, W).
         save_path (str): Path to save the image file.
+        
+    The function ensures the tensor is within [0, 1] range and converts it to a PIL image before saving.
     """
-    # Ensure the tensor image is in the correct range [0, 1]
     tensor_image = tensor_image.clamp(0, 1)
-    
-    # Convert the tensor to a PIL Image
     pil_image = transforms.ToPILImage()(tensor_image)
-    
-    # Create the directories if they do not exist
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    
-    # Save the image
     pil_image.save(save_path)
 
 
-def debug_dataset(dataset):
-    for low_res, high_res in dataset:
-        plt.figure()
-        plt.subplot(1, 2, 1)
-        plt.imshow(low_res.permute(1, 2, 0).numpy())
-        plt.title("Low Resolution")
-        plt.subplot(1, 2, 2)
-        plt.imshow(high_res.permute(1, 2, 0).numpy())
-        plt.title("High Resolution")
-        plt.show()
-        break
+def debug_dataset(dataset, num, dir=config.DEBUG_DIR):
+    """
+    Saves sample images from the dataset for debugging purposes.
+
+    This function helps visualize both low-resolution and high-resolution images
+    side by side, allowing you to inspect the dataset and ensure that the images
+    are being processed correctly before training the model. It saves the images
+    as PNG files in the specified directory.
+
+    Args:
+        dataset (iterable): The dataset to debug. Should be an iterable that yields
+                             tuples of (low_res_image, high_res_image).
+        num (int): The number of sample pairs to save from the dataset. This controls
+                   how many (low_res, high_res) pairs will be saved. The function
+                   will stop once this number is reached.
+        dir (str, optional): The directory where the debug images will be saved.
+                             Defaults to `config.DEBUG_DIR`. If the directory does
+                             not exist, it will be created.
+
+    Returns:
+        None: This function saves images to the specified directory and prints
+              out the paths where the images are saved.
+    """
+    os.makedirs(dir, exist_ok=True)
+    
+    for idx, (low_res, high_res) in enumerate(dataset):
+        fig, axs = plt.subplots(1, 2, figsize=(6, 3))
+
+        axs[0].imshow(low_res.permute(1, 2, 0).numpy())
+        axs[0].set_title("Low Resolution")
+        axs[0].axis("off")
+
+        axs[1].imshow(high_res.permute(1, 2, 0).numpy())
+        axs[1].set_title("High Resolution")
+        axs[1].axis("off")
+
+        debug_path = os.path.join(dir, f"debug_sample_{idx:03d}.png")
+        plt.savefig(debug_path, bbox_inches="tight")
+        plt.close(fig)
+
+        print(f"Saved debug image: {debug_path}")
+
+        if idx >= num:
+            break
+
+
+def save_generated_image(fake, epoch, batch_idx, dir=config.GENERATED_IMAGE_DIR):
+    """
+    Saves a generated image for visualization.
+    
+    Args:
+        fake (torch.Tensor): Generated high-resolution image tensor.
+        epoch (int): Current epoch.
+        batch_idx (int): Current batch index.
+        save_dir (str, optional): Directory to save images.
+    """
+    os.makedirs(dir, exist_ok=True)
+    img_path = os.path.join(dir, f"epoch_{epoch:03d}_batch_{batch_idx:03d}.png")
+    vutils.save_image(fake, img_path, normalize=True)
+    print(f"Saved generated image: {img_path}")
 
 
 def plot_training_losses(disc_losses, gen_losses, save_dir=config.ASSETS_DIR, filename="training_loss.png"):
     """
-    Plots and saves the loss curves for the critic and generator during training.
+    Plots and saves the loss curves for the discriminator and generator.
 
     Args:
-        disc_losses (list): List of discriminator loss values over epochs.
-        generator_losses (list): List of generator loss values over epochs.
-        save_dir (str, optional): Directory where plots will be saved. Defaults to config.ASSETS_DIR.
-        filename (str, optional): Base name of the saved plot file. Defaults to "training_loss.png".
+        disc_losses (list): List of discriminator loss values over training steps.
+        gen_losses (list): List of generator loss values over training steps.
+        save_dir (str, optional): Directory to save the plot. Defaults to config.ASSETS_DIR.
+        filename (str, optional): Name of the saved file. Defaults to "training_loss.png".
+
+    The function saves the plot and also displays it.
     """
     plt.figure(figsize=(10, 5))
     
     plt.plot(np.arange(len(disc_losses)), disc_losses, label="Discriminator Loss", alpha=0.7)
     plt.plot(np.arange(len(gen_losses)), gen_losses, label="Generator Loss", alpha=0.7)
     
-    # plt.plot(disc_losses, label="Discriminator Loss")
-    # plt.plot(gen_losses, label="Generator Loss")
-
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     
@@ -139,13 +187,15 @@ def plot_training_losses(disc_losses, gen_losses, save_dir=config.ASSETS_DIR, fi
 
 def log_metrics_to_tensorboard(writer, disc_loss, gen_loss, step):
     """
-    Logs loss values to TensorBoard.
+    Logs loss values to TensorBoard for visualization.
 
     Args:
         writer (SummaryWriter): TensorBoard writer instance.
-        disc_loss (float): Current discriminator loss value.
-        gen_loss (float): Current generator loss value.
-        step (int): Current training step for logging.
+        disc_loss (float): Discriminator loss at the current step.
+        gen_loss (float): Generator loss at the current step.
+        step (int): Training step number.
+
+    TensorBoard helps in tracking training progress over time.
     """
     writer.add_scalar("Discriminator Loss", disc_loss, global_step=step)
     writer.add_scalar("Generator Loss", gen_loss, global_step=step)
@@ -153,13 +203,15 @@ def log_metrics_to_tensorboard(writer, disc_loss, gen_loss, step):
     
 def log_images_to_tensorboard(writer, real_images, fake_images, step):
     """
-    Logs real and fake images to TensorBoard.
+    Logs real and generated images to TensorBoard.
 
     Args:
         writer (SummaryWriter): TensorBoard writer instance.
-        real_images (???): Real images.
-        fake_images (???): Fake images.
-        step (int): Current training step for logging.
+        real_images (torch.Tensor): Batch of real images (shape: B, C, H, W).
+        fake_images (torch.Tensor): Batch of generated images (shape: B, C, H, W).
+        step (int): Training step number.
+
+    Logs only the first 8 images from each batch for visualization.
     """
     grid_real = torchvision.utils.make_grid(real_images[:8], normalize=True)
     grid_fake = torchvision.utils.make_grid(fake_images[:8], normalize=True)
@@ -170,12 +222,15 @@ def log_images_to_tensorboard(writer, real_images, fake_images, step):
 
 def create_gif(save_dir=config.ASSETS_DIR, image_dir=config.GENERATED_IMAGE_DIR, filename="gan_training"):
     """
-    Creates a GIF from the saved sample images.
+    Creates a GIF from saved generated images.
 
     Args:
-        save_dir (str, optional): Directory to save the generated GIF. Defaults to config.ASSETS_DIR.
-        image_dir (str, optional): Directory containing the images. Defaults to config.IMAGE_DIR.
+        save_dir (str, optional): Directory to save the GIF. Defaults to config.ASSETS_DIR.
+        image_dir (str, optional): Directory containing the images. Defaults to config.GENERATED_IMAGE_DIR.
         filename (str, optional): Base name for the GIF file. Defaults to "gan_training".
+
+    The function sorts images by modification time before creating the GIF.
+    If no images are found, a warning is displayed.
     """
     if not os.path.exists(image_dir):
         print(f"Warning: No images found in {image_dir}.")
