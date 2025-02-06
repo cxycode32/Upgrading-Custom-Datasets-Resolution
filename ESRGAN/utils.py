@@ -77,7 +77,7 @@ def load_checkpoint(type, epoch, model, optimizer, dir=config.MODELS_DIR, learni
     print("Checkpoint loaded successfully.")
 
 
-def save_image(tensor_image, save_path):
+def custom_save_image(tensor_image, save_path):
     """
     Saves a tensor image to the specified path.
     
@@ -150,9 +150,13 @@ def save_generated_image(fake, epoch, batch_idx, dir=config.GENERATED_IMAGE_DIR)
         save_dir (str, optional): Directory to save images.
     """
     os.makedirs(dir, exist_ok=True)
-    img_path = os.path.join(dir, f"epoch_{epoch:03d}_batch_{batch_idx:03d}.png")
-    vutils.save_image(fake, img_path, normalize=True)
-    print(f"Saved generated image: {img_path}")
+    fake = fake.detach().cpu()
+    fake = torch.clamp(fake, 0, 1)
+    
+    for i in range(fake.size(0)):
+        img_path = os.path.join(dir, f"epoch_{epoch:03d}_batch_{batch_idx:03d}_img_{i:03d}.png")
+        vutils.save_image(fake[i], img_path, normalize=False)
+        print(f"Saved generated image: {img_path}")
 
 
 def plot_training_losses(disc_losses, gen_losses, save_dir=config.ASSETS_DIR, filename="training_loss.png"):
