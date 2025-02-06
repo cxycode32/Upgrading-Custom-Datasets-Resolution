@@ -2,7 +2,7 @@
 
 This repository implements Super-Resolution Generative Adversarial Networks (SRGAN and ESRGAN) using PyTorch. These models are designed to upscale low-resolution images to high-resolution versions, enhancing image quality for various applications like image restoration. Currently,
 - **SRGAN** ✅ Completed
-- **ESRGAN** 🚧 In Progress
+- **ESRGAN** ✅ Completed
 
 
 ## Project Overview
