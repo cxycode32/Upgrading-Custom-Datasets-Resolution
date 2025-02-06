@@ -4,7 +4,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 import config
-from utils import save_image
+from utils import custom_save_image
 
 
 class CustomDataset(Dataset):
@@ -75,7 +75,7 @@ class CustomDataset(Dataset):
         os.makedirs(save_dir, exist_ok=True)
 
         save_path = os.path.join(save_dir, image_name)
-        save_image(tensor_image, save_path)
+        custom_save_image(tensor_image, save_path)
     
 
 def resize_and_pad(image, target_size, fill_color=(0, 0, 0)):
